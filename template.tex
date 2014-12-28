@@ -1,15 +1,19 @@
 \usepackage{svg}
 \usepackage{amsmath}
+\usepackage[normalem]{ulem}
 \usetheme{Warsaw}
 \beamertemplatenavigationsymbolsempty
 \setbeamertemplate{footline}[frame number]
 \usefonttheme{structurebold}
 
+\setbeamertemplate{itemize items}[default]
+\setbeamertemplate{enumerate items}[default]
+
 
 \setbeamercolor{normal text}{fg=white,bg=black!95}
 \setbeamercolor{structure}{fg=white}
 
-\setbeamercolor{alerted text}{fg=red!85!black}
+\setbeamercolor{alerted text}{fg=red!60!white}
 
 \setbeamercolor{item projected}{use=item,fg=black,bg=item.fg!35}
 
@@ -22,6 +26,5 @@
 
 \setbeamercolor*{block title}{parent=structure,bg=black!60}
 \setbeamercolor*{block body}{fg=black,bg=black!10}
-\setbeamercolor*{block title alerted}{parent=alerted text,bg=black!15}
-\setbeamercolor*{block title example}{parent=example text,bg=black!15}
-\setbeamerfont{}{size=\tiny}
+\setbeamercolor*{block body alerted}{fg=black,bg=red!20!white}
+\setbeamercolor*{block title alerted}{fg=white,bg=red!80}

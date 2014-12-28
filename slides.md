@@ -1,23 +1,38 @@
-% Partial isomorphisms for error-free JSON round-trips
+% Error-free JSON round-trips
+% (half the typing, partial isomorphisms & Haskell)
 
-# The problem
+# What do I want to show you?
 
-## What are we trying to fix?
-Writing isomorphic printer/parsers with the "get" and "put" idiom is messy and
+\fontsize{14}{14}\selectfont
+
+How to write better printer/parsers such that we \alert{type less},
+\alert{think less} and make \alert{fewer mistakes}.
+
+
+# Outline
+
+. . .
+
+1. Define problem
+
+. . .
+
+2. Summarise paper
+
+. . .
+
+3. Build your own
+
+# What are we fixing?
+
+[alert=The problem]
+
+Writing round-trip printer/parsers with the get/put idiom is redundant and
 error prone.
 
-# The problem
+[/alert]
 
-## Get/put, look familiar?
-```haskell
--- | Wire encoding and decoding with the possibility
---   of a decode failing.
-class WireFormat a where
-    fromWire :: ByteString -> Either SomeException a
-    toWire   :: operation -> ByteString
-```
-
-# The problem
+# What are we fixing?
 
 ## Given a datatype:
 ```haskell
@@ -26,7 +41,17 @@ data ReadRequest
     | ExtendedReadRequest Address Time Time
   deriving (Eq, Show)
 ```
-# The problem
+
+# What are we fixing?
+
+## Get/put, look familiar?
+```haskell
+class WireFormat a where
+    fromWire :: ByteString -> Either SomeException a
+    toWire   :: a -> ByteString
+```
+
+# What are we fixing?
 
 ## Encoding (total)
 ```haskell
@@ -47,7 +72,7 @@ packWithHeaderByte header addr start end =
         putWord64LE start
         putWord64LE end
 ```
-# The problem
+# What are we fixing?
 
 ## Decoding (partial)
 ```haskell
@@ -69,7 +94,7 @@ fromWire bs
             _ -> fail "invalid header byte"
 ```
 
-# The problem
+# What are we fixing?
 
 ## So, we test it and hope for the best:
 
@@ -85,6 +110,26 @@ wireId op = id' op == op
     id' = fromRight . fromWire . toWire
     fromRight = either (error . show) id
 ```
+
+# Some proposed solutions
+
+# Some proposed solutions
+
+* Stop whining and trust the libraries
+
+# Some proposed solutions
+
+* \sout{Stop whining and trust the libraries} \alert{Too flexible.}
+
+# Some proposed solutions
+
+* \sout{Stop whining and trust the libraries} \alert{Too flexible.}
+* Template haskell/Generics
+
+# Some proposed solutions
+
+* \sout{Stop whining and trust the libraries} \alert{Too flexible.}
+* \sout{Template haskell/Generics} \alert{Not flexible enough.}
 
 # Introducing: Enterprise JSON
 
@@ -102,7 +147,13 @@ wireId op = id' op == op
 ```json
 "12/12/2012"
 ```
+. . .
 
+## "mmdddate"
+
+```json
+"12/12"
+```
 . . .
 
 ## "mmyydate"
@@ -123,18 +174,6 @@ OR
 "122012"
 ```
 
-. . .
-
-## "mmdddate"
-
-```json
-"12/12"
-```
-
-# Introducing: Enterprise JSON
-
-![](concerned.png)
-
 # Introducing: Enterprise JSON
 
 ## "checkbox"
@@ -143,11 +182,14 @@ OR
 "T"
 
 ```
+. . .
+
 ## "currency", "currency2" and "poscurrency"
 
 ```json
 "00.03"
 ```
+. . .
 
 ## "posfloat", "nonnegfloat"
 
@@ -157,16 +199,11 @@ OR
 
 # Introducing: Enterprise JSON
 
-## Oh hi! I just finished your JSON specification.
-![](dog.jpg)
-
-# Introducing: Enterprise JSON
-
-![](chan.png)
+![Concern for sanity](concerned.png)
 
 # A wild paper appears!
 
-![](paper.png)
+![](paper.png)\newline
 
 # Invertible Syntax Descriptions: way of the get/put
 
@@ -179,19 +216,11 @@ data List a
 
 # Invertible Syntax Descriptions: way of the get/put
 
-## Parsing
-```haskell
-parseMany :: Parser a → Parser (List a)
-parseMany p
-  =  const Nil <$> text ""
- <|> Cons      <$> p
-               <*> parseMany p
-```
+## Printing$^5$
 
-. . .
-
-## Printing
 ```haskell
+type Printer a = a -> Doc
+
 printMany :: Printer a -> Printer (List a)
 printMany p list
   = case list of
@@ -200,37 +229,58 @@ printMany p list
               <> printMany p xs
 ```
 
+. . .
+
+## Parsing$^6$
+```haskell
+parseMany :: Parser a -> Parser (List a)
+parseMany p
+  =  const Nil <$> text ""
+ <|> Cons      <$> p
+               <*> parseMany p
+```
+
+# Invertible Syntax Descriptions: way of the get/put
+
+## It would be nice if...
+
+```haskell
+combined :: Unicorn x => x a -> x (List a)
+combined p
+  =  magic Nil <$> faries ""
+ <|> Cons      <$> p
+               <*> parseMany p
+```
+
 # Invertible Syntax Descriptions: co/contravariance
 
-## Parser
+[block=Parser fmap]
+
 ```haskell
 newtype Parser a = Parser (String -> [(a, String)])
 
 (<$>) :: (a -> b) -> Parser a -> Parser b
 ```
 
+[/block]
+
 . . .
 
-## Printer
+[alert=Printer fmap]
+
 ```haskell
 type Printer a = a -> Doc
 
 (<$>) :: (b -> a) -> Printer a -> Printer b
 ```
 
-# Invertible Syntax Descriptions: co/contravariance
-## Partial isomorphism (academia decoded)
-```haskell
-data Iso a b = Iso
-    { apply   :: a -> Maybe b
-    , unapply :: b -> Maybe a
-    }
-```
+[/alert]
 
 # Invertible Syntax Descriptions: co/contravariance
 
 ## Partial isomorphisms for typists
 ```haskell
+-- Not the same as a Control.Lens Iso
 data Iso a b = Iso (a -> Maybe b) (b -> Maybe a)
 
 inverse :: Iso a b -> Iso b a
@@ -244,34 +294,58 @@ unapply = apply . inverse
 
 instance Category Iso where
     g . f = Iso (apply f   >=> apply g)
-                (unapply g >=> unapply f )
+                (unapply g >=> unapply f)
     id = Iso Just Just
 ```
 
 # Invertible Syntax Descriptions: co/contravariance
+## Partial Iso$^1$ (academia decoded)
 
-## Parser
 ```haskell
-instance Functor Parser where
-  (<$>) :: (a -> b) -> Parser a -> Parser b
+data Iso a b = Iso
+    { apply   :: a -> Maybe b
+    , unapply :: b -> Maybe a
+    }
 ```
 
-## Printer
+# Invertible Syntax Descriptions: co/contravariance
+
+[block=Parser fmap]
+
 ```haskell
-instance Functor Printer where
-  (<$>) :: (b -> a) -> Printer a -> Printer b
+newtype Parser a = Parser (String -> [(a, String)])
+
+(<$>) :: (a -> b) -> Parser a -> Parser b
 ```
+
+[/block]
+
 . . .
 
-## Combined
+[alert=Printer fmap]
+
+```haskell
+type Printer a = a -> Doc
+
+(<$>) :: (b -> a) -> Printer a -> Printer b
+```
+
+[/alert]
+
+. . .
+
+[block=The solution: IsoFunctor\$^2\$ ]
+
 ```haskell
 class IsoFunctor f where
   (<$>) :: Iso a b -> f a -> f b
 ```
 
+[/block]
+
 # Invertible Syntax Descriptions: applicative
 
-## Normal applicative
+[block=Normal applicative]
 
 ```haskell
 (<*>) :: f (a -> b) -> f a -> f  b
@@ -280,18 +354,22 @@ instance Applicative Parser where
   (<*>) :: Parser (a -> b) -> Parser a -> Parser b
 ```
 
+[/block]
+
 . . .
 
-## Adapting that directly
+[block=Adapting that directly]
 
 ```haskell
 class UnhelpfulIsoApplicative where
   (<*>) :: f (Iso a b) -> f a -> f b
 ```
 
+[/block]
+
 . . .
 
-## Falls apart on Printer (the contravariant one)
+[alert=Falls apart on Printer (the contravariant one)]
 
 ```haskell
 type Printer a = a -> Doc
@@ -300,6 +378,8 @@ instance Applicative Printer where
   (<*>) :: (Iso a b -> Doc) -> (a -> Doc) -> b -> Doc
   (f <*> g) b = error "impossible!"
 ```
+
+[/alert]
 
 # Invertible Syntax Descriptions: applicative
 
@@ -311,7 +391,7 @@ class Functor f => Applicative f where
 
 . . .
 
-## *#!@ it, associate right and tuple it applicative
+## *#!@ it, associate right and tuple (ProductFunctor$^3$)
 
 ```haskell
 class ProductFunctor f where
@@ -327,9 +407,11 @@ class ProductFunctor f where
 f :: Applicative f
   => (a -> b -> c -> d)
   -> f a -> f b -> f c -> f d
-f g fa fb fc =    g <$> fa  <*> fb  <*> fc
-f g fa fb fc = ((g <$> fa) <*> fb) <*> fc
+f ctor fa fb fc =   ctor <$> fa  <*> fb  <*> fc
+f ctor fa fb fc = ((ctor <$> fa) <*> fb) <*> fc
 ```
+
+. . .
 
 ## Our new, alternate universe
 
@@ -337,13 +419,22 @@ f g fa fb fc = ((g <$> fa) <*> fb) <*> fc
 f :: (ProductFunctor f, IsoFunctor f)
   => Iso (a, (b, c)) d
   -> f a -> f b -> f c -> f d
-f g fa fb fc = g <$>   fa <*> fb  <*> fc
-f g fa fb fc = g <$> ((fa <*> fb) <*> fc)
+f ctor fa fb fc = ctor <$>  fa <*> fb  <*> fc
+f ctor fa fb fc = ctor <$> (fa <*> (fb <*> fc))
 ```
 
 # Invertible Syntax Descriptions: applicative
 
-## Given a datatype:
+## We want these tuple tree isos for our data types
+
+```haskell
+nil  :: Iso ()          (List a)
+cons :: Iso (a, List a) (List a)
+```
+
+. . .
+
+## So we magic them:
 ```haskell
 data List a
   = Nil
@@ -352,26 +443,20 @@ data List a
 defineIsomorphisms ''List
 ```
 
-## We magic up:
-```haskell
-nil  :: Iso ()          (List a)
-cons :: Iso (a, List a) (List a)
-```
-
 # Invertible Syntax Descriptions: alternative
 
-## The final piece is trivial
+## Alternative$^4$ is trivial
 ```haskell
 class Alternative where
   (<|>) :: f a -> f a -> f a
 ```
 
-## And we now have an abstract syntax!
+## And we now have an abstract Syntax$^5$
 ```haskell
 
 class (IsoFunctor s, ProductFunctor s, Alternative s)
        => Syntax s where
-  pure :: Eq alpha => alpha -> delta alpha
+  pure :: Eq a => a -> s a
 ```
 
 # Invertible Syntax Descriptions: the punchline
@@ -399,8 +484,300 @@ printMany p list
 
 ## Invertible many
 ```haskell
-many :: Syntax s -> s a -> s [a]
+many :: Syntax s => s a -> s (List a)
 many p
   =  nil  <$> pure ()
  <|> cons <$> p <*> many p
+```
+
+# Invertible Syntax Descriptions: printer syntax
+
+## The implementation of Syntax for Printer
+```haskell
+instance IsoFunctor Printer where
+  iso <$> Printer p
+    = Printer (\b -> unapply iso b >>= p)
+
+instance ProductFunctor Printer where
+  Printer p <*> Printer q
+    = Printer (\(x, y) -> liftM2 (++) (p x) (q y))
+
+instance Alternative Printer where
+  Printer p <|> Printer q
+    = Printer (\s -> mplus (p s) (q s))
+
+instance Syntax Printer where
+  pure x
+    = Printer (\y -> if x == y then Just "" else N...)
+```
+
+# Let's try it on enterprise JSON!
+
+![Why must enterprise hurt us so?](sparta.jpg)
+
+# Let's try it on enterprise JSON!
+
+## Two primitives for all your JSON needs:
+
+```haskell
+class Syntax s => JsonSyntax s where
+    runSub :: s v -> s Value -> s v
+
+    value :: s Value
+```
+
+# JsonBuilder/Parser IsoFunctor
+
+## Starts off simple
+``` haskell
+newtype JsonBuilder a = JsonBuilder
+  { runBuilder :: a -> Maybe Value }
+
+newtype JsonParser a = JsonParser
+  { runParser :: Value -> Maybe a }
+
+instance IsoFunctor JsonBuilder where
+  (<$>) :: Iso a b -> JsonBuilder a -> JsonBuilder b
+  i <$> JsonBuilder b = JsonBuilder $ unapply i >=> b
+
+instance IsoFunctor JsonParser where
+  (<$>) :: Iso a b -> JsonParser a -> JsonParser b
+  i <$> JsonParser p = JsonParser $ apply i <=< p
+```
+# JsonBuilder ProductFunctor
+
+## Mush tuples together with applicative when building
+
+```haskell
+instance ProductFunctor JsonBuilder where
+  (<*>) :: JsonBuilder a
+        -> JsonBuilder b
+        -> JsonBuilder (a,b)
+  JsonBuilder p <*> JsonBuilder q =
+    JsonBuilder $ \(a,b) -> do
+      a' <- p a
+      b' <- q b
+      merge a' b'
+    where
+      merge (Object a) (Object b) =
+      	Just . Object $ a `union` b
+      merge a (Array b) = Just . Array $ V.cons a b
+      merge x Null = Just x
+      merge Null x = Just x
+      merge _ _ = Nothing
+```
+
+# JsonParser ProductFunctor
+
+## Take the things apart and tuple them when parsing
+```haskell
+instance ProductFunctor JsonParser where
+  (<*>) :: JsonParser a -> JsonParser b -> JsonParser (a,b)
+  JsonParser p <*> JsonParser q =
+    JsonParser $ \v -> do
+      let (a,b) | Array x <- v, Just y <- x !? 0
+                = (y, Array $ V.tail x)
+                | Array _ <- v
+       	        = (Null, Null)
+                | otherwise
+      	        = (v,v)
+      liftM2 (,) (p a) (q b)
+```
+
+# JsonBuilder/Parser Alternative
+
+
+## Try one, otherwise the other. Same implementation.
+```haskell
+instance Alternative JsonBuilder where
+  (<||>) :: JsonParser a -> JsonParser a -> JsonParser a
+  JsonBuilder p <||> JsonBuilder q =
+    JsonBuilder $ \a -> p a `mplus` q a
+
+  empty :: JsonParser a
+  empty = JsonBuilder $ const Nothing
+
+instance Alternative JsonParser where
+  (<||>) :: JsonParser a -> JsonParser a -> JsonParser a
+  JsonParser p <||> JsonParser q =
+    JsonParser $ \v -> p v `mplus` q v
+
+  empty :: JsonParser a
+  empty = JsonParser $ const Nothing
+```
+
+
+# JsonBuilder/Parser JsonSyntax
+## Try one maybe, otherwise take the other
+```haskell
+instance JsonSyntax JsonBuilder where
+  value :: JsonBuilder Value
+  value = JsonBuilder Just
+
+  runSub :: JsonBuilder v
+         -> JsonBuilder Value
+         -> JsonBuilder v
+  runSub (JsonBuilder a) (JsonBuilder b) =
+    JsonBuilder $ a >=> b
+
+instance JsonSyntax JsonParser where
+  value = JsonParser Just
+
+  runSub (JsonParser a) (JsonParser b) =
+    JsonParser $ a <=< b
+```
+
+# JsonSyntax combinators
+
+## Review/preview
+```haskell
+preview :: Prism' a b -> a -> Maybe b
+review  :: Prism' a b -> b -> a
+```
+# Prisms/isos are "stronger" than partial isos
+
+## Demoting prisms and "real" isos
+```haskell
+demote :: Prism' a b -> Iso a b
+demote p = unsafeMakeIso (preview p)
+                         (review (_Just . p))
+```
+
+# JsonSyntax combinators
+
+## Combinators come together
+
+```haskell
+_Bool :: Prism' Value Bool
+
+demote _Bool :: Iso Value Bool
+
+value :: s Value
+
+(<$>) :: Iso Value Bool -> s Value -> s Bool
+
+
+jsonBool :: JsonSyntax s => s Bool
+jsonBool = demote _Bool <$> value
+
+```
+
+. . .
+
+```haskell
+jsonNumber :: JsonSyntax s => s Scientific
+jsonNumber = demote _Number <$> value
+
+jsonString :: JsonSyntax s => s Text
+jsonString = demote _String <$> value
+```
+
+# JsonSyntax combinators
+
+## Looking up keys in objects
+
+```haskell
+runSub :: s v -> s Value -> s v
+
+jsonField
+    :: JsonSyntax s
+    => Text
+    -- ^ Key to lookup/insert
+    -> s v
+    -- ^ Sub-parser
+    -> s v
+jsonField k syntax = runSub syntax (keyIso <$> value)
+  where
+    keyIso = demote $ prism' (\x -> Object [(k,x)])
+                             (^? key k)
+```
+
+# JsonSyntax combinators
+
+## When you want to ensure something is there
+
+```haskell
+is :: (JsonSyntax s, Eq a) => s a -> a -> s ()
+is s a = demote (prism' (const a) 
+                (guard . (a ==))) <$> s
+```
+
+# JsonSyntax combinators
+
+![](combinators.png)
+
+# Example
+
+## We wish to produce and parse:
+
+```json
+[{ "colour" : "Rainbow"
+ , "lumps"  : [[true,false]
+              ,[false,false]]
+ , ":D"     : false
+ },
+ { ":D"     : true,
+   "bouncyness" : 3.14159265358979
+ }]
+```
+
+# Example
+
+## Round tripping balls
+
+```haskell
+data Ball
+    = Lumpy Text [[Bool]]
+    | Bouncy Double deriving (Eq, Show)
+defineIsomorphisms ''Ball
+
+ballSyntax :: JsonSyntax s => s Ball
+ballSyntax
+  =  lumpy <$> jsonField ":D" (jsonBool `is` False)
+            *> jsonField "colour" jsonString
+           <*> jsonField "xss" (many $ many jsonBool)
+ <|> bouncy
+           <$> jsonField ":D" (jsonBool `is` True)
+            *> jsonField "bouncyness" jsonRealFloat
+```
+
+# Example
+
+## The test
+
+```haskell
+main :: IO ()
+main = do
+    let tony  = Lumpy "Rainbow"
+                      [[True, False], [False, False]]
+    let oscar = Bouncy pi
+    let pit   = [tony, oscar]
+
+    let Just blob = runBuilder (many ballSyntax) pit
+    L.putStrLn $ encode blob
+
+    let Just pit' = runParser (many ballSyntax) blob
+    print pit'
+    print $ pit == pit'
+```
+
+# Examples
+
+## Output (whitespace added)
+
+```json
+[{ "colour" : "Rainbow"
+ , "lumps"  : [[true,false]
+              ,[false,false]]
+ , ":D"     : false
+ },
+ { ":D"     : true,
+   "bouncyness" : 3.14159265358979
+ }]
+
+[ Lumpy "Rainbow" [[True,False],[False,False]]
+, Bouncy 3.141592653589793
+]
+
+True
 ```
