@@ -1,5 +1,5 @@
-% Error-free JSON round-trips
-% (half the typing, partial isomorphisms & Haskell)
+% Round tripping balls
+% (with partial isomorphisms & Haskell)
 
 # What do I want to show you?
 
@@ -27,7 +27,7 @@ How to write better printer/parsers such that we \alert{type less},
 
 [alert=The problem]
 
-Writing round-trip printer/parsers with the get/put idiom is redundant and
+Writing isomorphic round-trip printer/parsers with the get/put idiom is redundant and
 error prone.
 
 [/alert]
@@ -100,9 +100,8 @@ fromWire bs
 
 ```haskell
 suite :: Spec
-suite = describe "WireFormat identity tests" $ do
+suite = describe "WireFormat identity tests" $
     prop "ReadRequest" (wireId :: ReadRequest -> Bool)
-    prop "ReadStream"  (wireId :: ReadStream -> Bool)
 
 wireId :: (Eq w, WireFormat w) => w -> Bool
 wireId op = id' op == op
@@ -111,25 +110,25 @@ wireId op = id' op == op
     fromRight = either (error . show) id
 ```
 
-# Some proposed solutions
+# Why don't you...
 
-# Some proposed solutions
+# Why don't you...
 
 * Stop whining and trust the libraries
 
-# Some proposed solutions
+# Why don't you...
 
 * \sout{Stop whining and trust the libraries} \alert{Too flexible.}
 
-# Some proposed solutions
+# Why don't you...
 
 * \sout{Stop whining and trust the libraries} \alert{Too flexible.}
-* Template haskell/Generics
+* Use template haskell/generics
 
-# Some proposed solutions
+# Why don't you...
 
 * \sout{Stop whining and trust the libraries} \alert{Too flexible.}
-* \sout{Template haskell/Generics} \alert{Not flexible enough.}
+* \sout{Use template haskell/generics} \alert{Not flexible enough.}
 
 # Introducing: Enterprise JSON
 
@@ -216,7 +215,7 @@ data List a
 
 # Invertible Syntax Descriptions: way of the get/put
 
-## Printing$^5$
+## Printing$^1$
 
 ```haskell
 type Printer a = a -> Doc
@@ -231,7 +230,7 @@ printMany p list
 
 . . .
 
-## Parsing$^6$
+## Parsing$^2$
 ```haskell
 parseMany :: Parser a -> Parser (List a)
 parseMany p
@@ -247,7 +246,7 @@ parseMany p
 ```haskell
 combined :: Unicorn x => x a -> x (List a)
 combined p
-  =  magic Nil <$> faries ""
+  =  magic Nil <$> fairies ""
  <|> Cons      <$> p
                <*> parseMany p
 ```
@@ -277,29 +276,7 @@ type Printer a = a -> Doc
 [/alert]
 
 # Invertible Syntax Descriptions: co/contravariance
-
-## Partial isomorphisms for typists
-```haskell
--- Not the same as a Control.Lens Iso
-data Iso a b = Iso (a -> Maybe b) (b -> Maybe a)
-
-inverse :: Iso a b -> Iso b a
-inverse (Iso f g) = Iso g f
-
-apply :: Iso a b -> a -> Maybe b
-apply (Iso f g) = f
-
-unapply :: Iso a b -> b -> Maybe a
-unapply = apply . inverse
-
-instance Category Iso where
-    g . f = Iso (apply f   >=> apply g)
-                (unapply g >=> unapply f)
-    id = Iso Just Just
-```
-
-# Invertible Syntax Descriptions: co/contravariance
-## Partial Iso$^1$ (academia decoded)
+## Partial Iso$^3$ (academia decoded)
 
 ```haskell
 data Iso a b = Iso
@@ -334,7 +311,7 @@ type Printer a = a -> Doc
 
 . . .
 
-[block=The solution: IsoFunctor\$^2\$ ]
+[block=The solution: IsoFunctor\$^4\$ ]
 
 ```haskell
 class IsoFunctor f where
@@ -342,6 +319,14 @@ class IsoFunctor f where
 ```
 
 [/block]
+
+# Invertible Syntax Descriptions: co/contravariance
+
+The important things about partial isos and IsoFunctor:
+
+* Unifying functor requires both functions $a \to b$ and $b \to a$
+* We unify both in a partial Iso, where these functions can fail
+* We defined IsoFunctor (from partial isos to printer/parsers)
 
 # Invertible Syntax Descriptions: applicative
 
@@ -391,7 +376,7 @@ class Functor f => Applicative f where
 
 . . .
 
-## *#!@ it, associate right and tuple (ProductFunctor$^3$)
+## *#!@ it, associate right and tuple (ProductFunctor$^5$)
 
 ```haskell
 class ProductFunctor f where
@@ -434,7 +419,7 @@ cons :: Iso (a, List a) (List a)
 
 . . .
 
-## So we magic them:
+## So we magic them up from the data type:
 ```haskell
 data List a
   = Nil
@@ -443,15 +428,24 @@ data List a
 defineIsomorphisms ''List
 ```
 
+# Invertible Syntax Descriptions: applicative
+
+The important things about ProductFunctor:
+
+* Naively adapting Applicative leaves us with an uninhabitable type.
+* We use ProductFunctor, it has tuples instead of currying and associates
+  right
+* <*> mushes tuples together one way, and takes them apart the other
+
 # Invertible Syntax Descriptions: alternative
 
-## Alternative$^4$ is trivial
+## Alternative$^6$ is trivial
 ```haskell
 class Alternative where
   (<|>) :: f a -> f a -> f a
 ```
 
-## And we now have an abstract Syntax$^5$
+## And we now have an abstract Syntax$^7$
 ```haskell
 
 class (IsoFunctor s, ProductFunctor s, Alternative s)
@@ -463,7 +457,7 @@ class (IsoFunctor s, ProductFunctor s, Alternative s)
 
 ## Parsing
 ```haskell
-parseMany :: Parser a → Parser (List a)
+parseMany :: Parser a -> Parser (List a)
 parseMany p
   =  const Nil <$> text ""
  <|> Cons      <$> p
@@ -511,9 +505,16 @@ instance Syntax Printer where
     = Printer (\y -> if x == y then Just "" else N...)
 ```
 
+# Invertible Syntax Descriptions: summary
+
+* Partial isos: composable building blocks for munging data
+* IsoFunctor: to "lift" theses isos into concrete printers or parsers
+* ProductFunctor: to handle multiple fields and recursion via tuples
+* Syntax: to glue all these constraints together and add pure
+
 # Let's try it on enterprise JSON!
 
-![Why must enterprise hurt us so?](sparta.jpg)
+![We are now enterprise developers](dog.jpg)
 
 # Let's try it on enterprise JSON!
 
@@ -590,11 +591,11 @@ instance ProductFunctor JsonParser where
 ## Try one, otherwise the other. Same implementation.
 ```haskell
 instance Alternative JsonBuilder where
-  (<||>) :: JsonParser a -> JsonParser a -> JsonParser a
+  (<||>) :: JsonBuilder a -> JsonBuilder a -> JsonBuilder a
   JsonBuilder p <||> JsonBuilder q =
     JsonBuilder $ \a -> p a `mplus` q a
 
-  empty :: JsonParser a
+  empty :: JsonBuilder a
   empty = JsonBuilder $ const Nothing
 
 instance Alternative JsonParser where
@@ -608,7 +609,7 @@ instance Alternative JsonParser where
 
 
 # JsonBuilder/Parser JsonSyntax
-## Try one maybe, otherwise take the other
+## Providing access to underlying JSON Values
 ```haskell
 instance JsonSyntax JsonBuilder where
   value :: JsonBuilder Value
@@ -699,16 +700,31 @@ jsonField k syntax = runSub syntax (keyIso <$> value)
 ```haskell
 is :: (JsonSyntax s, Eq a) => s a -> a -> s ()
 is s a = demote (prism' (const a) 
-                (guard . (a ==))) <$> s
+                        (guard . (a ==))) <$> s
 ```
 
-# JsonSyntax combinators
+# JsonSyntax summary
 
-![](combinators.png)
+* JsonSyntax: to provide access to the underlying domain specific data
+* Prisms are stronger than partial isos
+* lens-aeson made it easy to define JSON combinators
 
-# Example
+# Example - Round-tripping balls
 
-## We wish to produce and parse:
+![A happy ball](tripping.jpg)
+
+# Example - Round-tripping balls
+
+## We can have either bouncy or lumpy balls
+
+```haskell
+data Ball
+    = Lumpy Text [[Bool]]
+    | Bouncy Double
+  deriving (Eq, Show)
+```
+
+##  Bouncy balls are happy, lumpy ones are not.
 
 ```json
 [{ "colour" : "Rainbow"
@@ -721,27 +737,28 @@ is s a = demote (prism' (const a)
  }]
 ```
 
-# Example
+# Example - Round-tripping balls
 
-## Round tripping balls
+## Ball syntax
 
 ```haskell
 data Ball
     = Lumpy Text [[Bool]]
-    | Bouncy Double deriving (Eq, Show)
-defineIsomorphisms ''Ball
+    | Bouncy Double
+  deriving (Eq, Show)
+  defineIsomorphisms ''Ball
 
 ballSyntax :: JsonSyntax s => s Ball
 ballSyntax
   =  lumpy <$> jsonField ":D" (jsonBool `is` False)
             *> jsonField "colour" jsonString
-           <*> jsonField "xss" (many $ many jsonBool)
+           <*> jsonField "lumps" (many $ many jsonBool)
  <|> bouncy
            <$> jsonField ":D" (jsonBool `is` True)
             *> jsonField "bouncyness" jsonRealFloat
 ```
 
-# Example
+# Example - Round-tripping balls
 
 ## The test
 
@@ -761,7 +778,7 @@ main = do
     print $ pit == pit'
 ```
 
-# Examples
+# Example - Round-tripping balls
 
 ## Output (whitespace added)
 
@@ -780,4 +797,67 @@ main = do
 ]
 
 True
+```
+
+# Real world example with full library
+
+## Currency parser
+```haskell
+-- | Parse an enterprise currency field, which is a blob of text looking like:
+--
+--   "00.43"
+--
+-- This un-/parser retains all precision avaliable.
+currency :: JsonSyntax s => s Scientific
+currency = demoteLR "enterprise currency" (prism' f g) <$> value
+  where
+    f = String . LT.toStrict . LT.toLazyText . fmt
+    g = readMaybe . ST.unpack . ST.filter (not . isSpace) <=< preview _String
+    -- We render with arbitrary precision (Nothing) with standard decimal
+    -- notation (Fixed)
+    fmt = LT.formatScientificBuilder Fixed Nothing
+```
+
+# Real world example with full library
+
+## Date time parser
+
+```haskell
+-- | Parse an enterprise datetime field, which is looks like:
+--
+--    "20/6/2014 4:25 pm"
+datetime :: JsonSyntax s => s UTCTime
+datetime = demoteLR "enterprise datetime" (prism' f g) <$> value
+  where
+    f = String . ST.pack . opts formatTime
+    g = opts parseTime . ST.unpack <=< preview _String
+    opts h = h defaultTimeLocale "%-d/%-m/%Y %-l:%M %P"
+```
+
+# Summary/Conclusion
+
+* Invertible syntax descriptions are a way to write better printer/parsers such
+  that we \alert{type less}, \alert{think less} and make \alert{fewer
+  mistakes}.
+* Problem: writing round-trip printer/parsers with the get/put idiom is
+  \alert{redundant and error prone}.
+* Generics/TH \alert{too rigid}, libraries \alert{too flexible}.
+* A reasonable middle ground is detailed in the paper by \alert{Tillmann Rendel
+  and Klaus Ostermann}. \alert{Invertible Syntax Descriptions}: Unifying
+  Parsing and Pretty Printing.
+* I'd love to work with people on improving the current machinery.
+* Our library: http://github.com/anchor/roundtrip-aeson
+
+# A note on categories
+
+## Ekmett's "categories" package, more category-like functors.
+
+```haskell
+import qualified Control.Categorical.Functor as CF
+
+type Hask = (->)
+
+instance CF.Functor JsonBuilder Iso Hask where
+    fmap iso (JsonBuilder f) =
+        JsonBuilder (unapply iso >=> f)
 ```
