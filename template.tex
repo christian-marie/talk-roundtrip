@@ -1,5 +1,7 @@
 \usepackage{svg}
 \usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{shapes.arrows}
 \usepackage[normalem]{ulem}
 \usetheme{Warsaw}
 \beamertemplatenavigationsymbolsempty
@@ -28,3 +30,19 @@
 \setbeamercolor*{block body}{fg=black,bg=black!10}
 \setbeamercolor*{block body alerted}{fg=black,bg=red!20!white}
 \setbeamercolor*{block title alerted}{fg=white,bg=red!80}
+
+\tikzset{
+    myarrow/.style={
+        draw,
+        fill=black,
+        single arrow,
+        minimum height=3.5ex,
+        single arrow head extend=1ex
+    }
+}
+\newcommand{\arrowup}{%
+\tikz [baseline=-0.5ex]{\node [myarrow,rotate=90] {};}
+}
+\newcommand{\arrowdown}{%
+\tikz [baseline=-1ex]{\node [myarrow,rotate=-90] {};}
+}

@@ -1,10 +1,12 @@
 ---
-title: Error-free JSON round trips
+title: Round tripping balls (with partial isomorphisms & Haskell)
 author: Christian Marie \<christian@ponies.io\>
 date: yay
 header-includes:
     - \usepackage{fancyhdr}
+    - \usepackage{eucal}
     - \pagestyle{fancy}
+    - \renewcommand{\footrulewidth}{0.4pt}% default is 0pt
     - \fancyfoot[LO,LE]{Christian Marie <christian@ponies.io>}
     - \fancyfoot[RO,RE]{ https://github.com/anchor/roundtrip-aeson/ \linebreak
                          https://hackage.haskell.org/package/roundtrip/ \linebreak
@@ -40,7 +42,7 @@ data Iso a b = Iso
     }
 ```
 
-4. IsoFunctor: the functor[^4] from Iso to f (Printer, Parser).
+4. IsoFunctor: the functor[^4] from Iso to Hask (restricted to f).
 
 ```haskell
 class IsoFunctor f where
@@ -82,20 +84,24 @@ class Syntax s => JsonSyntax s where
 
 \newpage
 
-[^3]: Isomorphism: A pair of functions $f : A \to B$ and $g : B \to A$, that
+[^3]: Isomorphism: A pair of functions $f : A \to B$ and $g : B \to A$ that
 are inverses such that:
 
       1. $f \circ g \equiv id_B$
       2. $g \circ f \equiv id_A$
 
-[^4]: Functor: A principled way of taking a "thing" and having it make sense in a different
-      context. The canonical example in haskell would be the Functor typeclass which
-      takes morphisms in Hask (functions from one type to another) and makes them
-      work on something else, such as applying them to every element of a list.
+[^4]: Functor: A principled way of taking a "thing" and "moving" it into a
+      different context whilst preserving some notion of structure.
+      
+      The canonical Haskell example is the Functor typeclass. Given two types
+      (\mbox{$\forall{a,b} \in Hask$}) that have a function between them
+      (\mbox{$\exists{f: a \to b}$}) we can produce a functored function
+      (\mbox{$\forall F \in Functor.\ {F(f) : F(a) \to  F(b)}$}).
 
-      More formally: a functor, F, is a transformation between categories C
-      and D that maps morphisms and objects in C to morphisms and objects in D such
-      that a few rules hold given objects A and B in category C:
+      More formally: a functor, F, is a transformation between categories
+      $\mathcal{C}$ and $\mathcal{D}$ that maps morphisms and objects in
+      $\mathcal{C}$ to morphisms and objects in $\mathcal{D}$ such that a few
+      rules hold given objects $A, B \in \mathcal{C}$:
       
       1. $F(f : A \to B) = F(f) : F(A) \to F(B)$
       2. $F(id_A) = id_{F(A)}$

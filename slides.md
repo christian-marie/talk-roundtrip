@@ -34,99 +34,111 @@ error prone.
 
 # What are we fixing?
 
-## Given a datatype:
+## We can have either bouncy or lumpy balls
 ```haskell
-data ReadRequest
-    = SimpleReadRequest   Address Time Time
-    | ExtendedReadRequest Address Time Time
+data Ball
+    = Lumpy  { _colour     :: Text
+             , _lumps      :: [[Bool]]
+             }
+    | Bouncy { _bouncyness :: Double }
   deriving (Eq, Show)
 ```
-
 # What are we fixing?
 
-## Get/put, look familiar?
+## Bouncy balls are happy, lumpy ones are not.
 ```haskell
-class WireFormat a where
-    fromWire :: ByteString -> Either SomeException a
-    toWire   :: a -> ByteString
+[ Lumpy  {_colour = "Rainbow"
+         , _lumps = [[True,False],[False,False]]}
+, Bouncy {_bouncyness = 3.141592653589793}]
+```
+\center{\arrowdown}
+
+```javascript
+[
+   {
+      "colour" : "Rainbow",
+      ":D" : false,
+      "lumps" : [[true,false],[false,false]]
+   },
+   {
+      "bouncyness" : 3.14159265358979,
+      ":D" : true
+   }
+]
 ```
 
 # What are we fixing?
 
-## Encoding (total)
+## We want to parse (partial)
+
 ```haskell
-
-instance WireFormat ReadRequest where
-    toWire (SimpleReadRequest addr start end) =
-        packWithHeaderByte 0 addr start end
-    toWire (ExtendedReadRequest addr start end) =
-        packWithHeaderByte 1 addr start end
-
-packWithHeaderByte :: Word8 -> Address -> Time -> Time
-                   -> ByteString
-packWithHeaderByte header addr start end =
-    let addr_bytes = toWire addr
-    in runPacking 25 $ do
-        putWord8 header
-        putBytes addr_bytes
-        putWord64LE start
-        putWord64LE end
-```
-# What are we fixing?
-
-## Decoding (partial)
-```haskell
-fromWire bs
-    | S.length bs /= 25 =
-        Left . SomeException $ userError "/= 25 bytes"
-    | otherwise = flip tryUnpacking bs $ do
-        header <- getWord8
-        addr_bytes <- getBytes 8
-        addr <- either (fail . show) return $
-            fromWire addr_bytes
-        start <- getWord64LE
-        end <- getWord64LE
-        case header of
-            0 -> return $
-                    SimpleReadRequest addr start end
-            1 -> return $
-                    ExtendedReadRequest addr start end
-            _ -> fail "invalid header byte"
+instance FromJSON Ball where
+  parseJSON :: Value -> Parser Ball
+  parseJSON (Object o) = do
+    happy_ball <- o .: ":D"
+    if happy_ball then parseBouncy else parseLumpy
+   where
+    parseBouncy =
+        Bouncy <$> o .: "bouncyness"
+    parseLumpy =
+        Lumpy <$> o .: "colour" <*> o .: "lumps"
 ```
 
 # What are we fixing?
 
-## So, we test it and hope for the best:
+## And we want to print.
 
 ```haskell
-suite :: Spec
-suite = describe "WireFormat identity tests" $
-    prop "ReadRequest" (wireId :: ReadRequest -> Bool)
-
-wireId :: (Eq w, WireFormat w) => w -> Bool
-wireId op = id' op == op
-  where
-    id' = fromRight . fromWire . toWire
-    fromRight = either (error . show) id
+instance ToJSON Ball where
+  toJSON :: Ball -> Value
+  toJSON (Lumpy colour lump_map) =
+      object [ ":D"     .= True
+             , "colour" .= colour
+             , "lumps"  .= lump_map
+             ]
+  toJSON (Bouncy bouncyness) =
+      object [ ":D"         .= True
+             , "bouncyness" .= bouncyness
+             ]
 ```
+
+# What are we fixing?
+
+[alert=Duplicate information!]
+
+Potential errors and good programmers *HATE* typing
+
+[/alert]
+
 
 # Why don't you...
 
+* Just write some tests
+
 # Why don't you...
 
+* \sout{Just write some tests} \alert{Unnecessary boilerplate.}
 * Stop whining and trust the libraries
 
 # Why don't you...
 
+* \sout{Just write some tests} \alert{Unnecessary boilerplate.}
+* Stop whining and trust the libraries
+
+# Why don't you...
+
+* \sout{Just write some tests} \alert{Unnecessary boilerplate.}
 * \sout{Stop whining and trust the libraries} \alert{Too flexible.}
 
 # Why don't you...
 
+* \sout{Just write some tests} \alert{Unnecessary boilerplate.}
 * \sout{Stop whining and trust the libraries} \alert{Too flexible.}
 * Use template haskell/generics
 
 # Why don't you...
 
+* \sout{Just write some tests} \alert{Unnecessary boilerplate.}
 * \sout{Stop whining and trust the libraries} \alert{Too flexible.}
 * \sout{Use template haskell/generics} \alert{Not flexible enough.}
 
@@ -232,6 +244,8 @@ printMany p list
 
 ## Parsing$^2$
 ```haskell
+newtype Parser a = Parser (String -> [(a, String)])
+
 parseMany :: Parser a -> Parser (List a)
 parseMany p
   =  const Nil <$> text ""
@@ -259,11 +273,40 @@ combined p
 newtype Parser a = Parser (String -> [(a, String)])
 
 (<$>) :: (a -> b) -> Parser a -> Parser b
+f <$> Parser p = Parser $ (fmap . first) f . p
 ```
 
 [/block]
 
 . . .
+
+[block=Printer fmap]
+
+```haskell
+type Printer a = a -> Doc
+
+(<$>) :: (a -> b) -> Printer a -> Printer b
+```
+
+[/block]
+
+. . .
+
+Can you implement this? \arrowup
+
+# Invertible Syntax Descriptions: co/contravariance
+
+Covariant  \arrowdown
+
+[block=Parser fmap]
+
+```haskell
+newtype Parser a = Parser (String -> [(a, String)])
+
+(<$>) :: (a -> b) -> Parser a -> Parser b
+```
+
+[/block]
 
 [alert=Printer fmap]
 
@@ -275,8 +318,10 @@ type Printer a = a -> Doc
 
 [/alert]
 
+Contravariant \arrowup
+
 # Invertible Syntax Descriptions: co/contravariance
-## Partial Iso$^3$ (academia decoded)
+## Partial Iso$^3$ (simplified)
 
 ```haskell
 data Iso a b = Iso
@@ -324,8 +369,16 @@ class IsoFunctor f where
 
 The important things about partial isos and IsoFunctor:
 
-* Unifying functor requires both functions $a \to b$ and $b \to a$
-* We unify both in a partial Iso, where these functions can fail
+. . .
+
+* Unifying a functor requires both $a \to b$ and $b \to a$
+
+. . .
+
+* We unify both with a partial Iso, where these functions can fail
+
+. . .
+
 * We defined IsoFunctor (from partial isos to printer/parsers)
 
 # Invertible Syntax Descriptions: applicative
@@ -333,7 +386,7 @@ The important things about partial isos and IsoFunctor:
 [block=Normal applicative]
 
 ```haskell
-(<*>) :: f (a -> b) -> f a -> f  b
+(<*>) :: f (a -> b) -> f a -> f b
 
 instance Applicative Parser where
   (<*>) :: Parser (a -> b) -> Parser a -> Parser b
@@ -359,7 +412,7 @@ class UnhelpfulIsoApplicative where
 ```haskell
 type Printer a = a -> Doc
 
-instance Applicative Printer where
+instance UnhelpfulIsoApplicative Printer where
   (<*>) :: (Iso a b -> Doc) -> (a -> Doc) -> b -> Doc
   (f <*> g) b = error "impossible!"
 ```
@@ -432,9 +485,17 @@ defineIsomorphisms ''List
 
 The important things about ProductFunctor:
 
+. . .
+
 * Naively adapting Applicative leaves us with an uninhabitable type.
+
+. . .
+
 * We use ProductFunctor, it has tuples instead of currying and associates
   right
+
+. . .
+
 * <*> mushes tuples together one way, and takes them apart the other
 
 # Invertible Syntax Descriptions: alternative
@@ -507,9 +568,20 @@ instance Syntax Printer where
 
 # Invertible Syntax Descriptions: summary
 
+. . .
+
 * Partial isos: composable building blocks for munging data
+
+. . .
+
 * IsoFunctor: to "lift" theses isos into concrete printers or parsers
+
+. . .
+
 * ProductFunctor: to handle multiple fields and recursion via tuples
+
+. . .
+
 * Syntax: to glue all these constraints together and add pure
 
 # Let's try it on enterprise JSON!
@@ -630,6 +702,19 @@ instance JsonSyntax JsonParser where
 
 # JsonSyntax combinators
 
+The lens-aeson package provides primitives for most of the combinators we want,
+but it has these \sout{terrifying} powerful Prism things:
+
+## Prism
+```haskell
+type Prism s t a b =
+    (Choice p, Applicative f) =>
+      p a (f b) -> p s (f t)
+
+type Prism' s a = Prism s s a a
+```
+
+
 ## Review/preview
 ```haskell
 preview :: Prism' a b -> a -> Maybe b
@@ -637,7 +722,7 @@ review  :: Prism' a b -> b -> a
 ```
 # Prisms/isos are "stronger" than partial isos
 
-## Demoting prisms and "real" isos
+## Demoting prisms and "real" isos to partial ones
 ```haskell
 demote :: Prism' a b -> Iso a b
 demote p = unsafeMakeIso (preview p)
@@ -646,21 +731,28 @@ demote p = unsafeMakeIso (preview p)
 
 # JsonSyntax combinators
 
-## Combinators come together
+## Given a "free" Prism from lens-aeson
 
 ```haskell
 _Bool :: Prism' Value Bool
+```
 
+. . . 
+
+## We can get an Iso and have a Value
+```haskell
 demote _Bool :: Iso Value Bool
+value :: Syntax s => s Value
+```
 
-value :: s Value
+. . .
 
+## Fmapping these gives us "free" combinators
+```haskell
 (<$>) :: Iso Value Bool -> s Value -> s Bool
-
 
 jsonBool :: JsonSyntax s => s Bool
 jsonBool = demote _Bool <$> value
-
 ```
 
 . . .
@@ -705,9 +797,22 @@ is s a = demote (prism' (const a)
 
 # JsonSyntax summary
 
+. . .
+
 * JsonSyntax: to provide access to the underlying domain specific data
+
+. . .
+
 * Prisms are stronger than partial isos
+
+. . .
+
 * lens-aeson made it easy to define JSON combinators
+
+. . .
+
+* These combinators can be thought of as relations between abstract syntax and
+  concrete syntax.
 
 # Example - Round-tripping balls
 
@@ -716,25 +821,37 @@ is s a = demote (prism' (const a)
 # Example - Round-tripping balls
 
 ## We can have either bouncy or lumpy balls
-
 ```haskell
 data Ball
-    = Lumpy Text [[Bool]]
-    | Bouncy Double
+    = Lumpy  { _colour     :: Text
+             , _lumps      :: [[Bool]]
+             }
+    | Bouncy { _bouncyness :: Double }
   deriving (Eq, Show)
 ```
 
-##  Bouncy balls are happy, lumpy ones are not.
+# Example - Round-tripping balls
 
-```json
-[{ "colour" : "Rainbow"
- , "lumps"  : [[true,false]
-              ,[false,false]]
- , ":D"     : false
- },
- { ":D"     : true,
-   "bouncyness" : 3.14159265358979
- }]
+## Bouncy balls are happy, lumpy ones are not.
+```haskell
+[ Lumpy  {_colour = "Rainbow"
+         , _lumps = [[True,False],[False,False]]}
+, Bouncy {_bouncyness = 3.141592653589793}]
+```
+\center{\arrowdown}
+
+```javascript
+[
+   {
+      "colour" : "Rainbow",
+      ":D" : false,
+      "lumps" : [[true,false],[false,false]]
+   },
+   {
+      "bouncyness" : 3.14159265358979,
+      ":D" : true
+   }
+]
 ```
 
 # Example - Round-tripping balls
@@ -742,12 +859,6 @@ data Ball
 ## Ball syntax
 
 ```haskell
-data Ball
-    = Lumpy Text [[Bool]]
-    | Bouncy Double
-  deriving (Eq, Show)
-  defineIsomorphisms ''Ball
-
 ballSyntax :: JsonSyntax s => s Ball
 ballSyntax
   =  lumpy <$> jsonField ":D" (jsonBool `is` False)
@@ -782,15 +893,16 @@ main = do
 
 ## Output (whitespace added)
 
-```json
-[{ "colour" : "Rainbow"
- , "lumps"  : [[true,false]
-              ,[false,false]]
- , ":D"     : false
- },
- { ":D"     : true,
-   "bouncyness" : 3.14159265358979
- }]
+```javascript
+[  {
+      "colour" : "Rainbow",
+      ":D" : false,
+      "lumps" : [[true,false],[false,false]]
+   },
+   {
+      "bouncyness" : 3.14159265358979,
+      ":D" : true
+}  ]
 
 [ Lumpy "Rainbow" [[True,False],[False,False]]
 , Bouncy 3.141592653589793
@@ -803,18 +915,20 @@ True
 
 ## Currency parser
 ```haskell
--- | Parse an enterprise currency field, which is a blob of text looking like:
+-- | Parse an enterprise currency field, which is a
+--   blob of text looking like:
 --
 --   "00.43"
 --
 -- This un-/parser retains all precision avaliable.
 currency :: JsonSyntax s => s Scientific
-currency = demoteLR "enterprise currency" (prism' f g) <$> value
+currency = demoteLR "currency" (prism' f g) <$> value
   where
     f = String . LT.toStrict . LT.toLazyText . fmt
-    g = readMaybe . ST.unpack . ST.filter (not . isSpace) <=< preview _String
-    -- We render with arbitrary precision (Nothing) with standard decimal
-    -- notation (Fixed)
+    g = readMaybe . ST.unpack
+      . ST.filter (not . isSpace) <=< preview _String
+    -- We render with arbitrary precision (Nothing)
+    -- and standard decimal notation (Fixed)
     fmt = LT.formatScientificBuilder Fixed Nothing
 ```
 
@@ -823,29 +937,47 @@ currency = demoteLR "enterprise currency" (prism' f g) <$> value
 ## Date time parser
 
 ```haskell
--- | Parse an enterprise datetime field, which is looks like:
+-- | Parse an enterprise datetime field, looks like:
 --
 --    "20/6/2014 4:25 pm"
 datetime :: JsonSyntax s => s UTCTime
-datetime = demoteLR "enterprise datetime" (prism' f g) <$> value
+datetime = demoteLR "datetime" (prism' f g) <$> value
   where
     f = String . ST.pack . opts formatTime
     g = opts parseTime . ST.unpack <=< preview _String
-    opts h = h defaultTimeLocale "%-d/%-m/%Y %-l:%M %P"
+    opts h =
+      h defaultTimeLocale "%-d/%-m/%Y %-l:%M %P"
 ```
 
 # Summary/Conclusion
 
+. . .
+
 * Invertible syntax descriptions are a way to write better printer/parsers such
   that we \alert{type less}, \alert{think less} and make \alert{fewer
   mistakes}.
+
+. . .
+
 * Problem: writing round-trip printer/parsers with the get/put idiom is
   \alert{redundant and error prone}.
+
+. . .
+
 * Generics/TH \alert{too rigid}, libraries \alert{too flexible}.
+
+. . .
+
 * A reasonable middle ground is detailed in the paper by \alert{Tillmann Rendel
   and Klaus Ostermann}. \alert{Invertible Syntax Descriptions}: Unifying
   Parsing and Pretty Printing.
+
+. . .
+
 * I'd love to work with people on improving the current machinery.
+
+. . .
+
 * Our library: http://github.com/anchor/roundtrip-aeson
 
 # A note on categories
