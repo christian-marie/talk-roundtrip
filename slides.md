@@ -32,9 +32,7 @@ error prone.
 
 [/alert]
 
-# What are we fixing?
-
-## We can have either bouncy or lumpy balls
+# We can have either bouncy or lumpy balls
 ```haskell
 data Ball
     = Lumpy  { _colour     :: Text
@@ -43,9 +41,8 @@ data Ball
     | Bouncy { _bouncyness :: Double }
   deriving (Eq, Show)
 ```
-# What are we fixing?
+# Bouncy balls are happy, lumpy ones are not.
 
-## Bouncy balls are happy, lumpy ones are not.
 ```haskell
 [ Lumpy  {_colour = "Rainbow"
          , _lumps = [[True,False],[False,False]]}
@@ -54,22 +51,18 @@ data Ball
 \center{\arrowdown}
 
 ```javascript
-[
-   {
+[{
       "colour" : "Rainbow",
-      ":D" : false,
-      "lumps" : [[true,false],[false,false]]
-   },
-   {
+      ":D"     : false,
+      "lumps"  : [[true,false],[false,false]]
+ }
+,{
       "bouncyness" : 3.14159265358979,
-      ":D" : true
-   }
-]
+      ":D"         : true
+ }]
 ```
 
-# What are we fixing?
-
-## We want to parse (partial)
+# We want to parse (partial)
 
 ```haskell
 instance FromJSON Ball where
@@ -84,9 +77,7 @@ instance FromJSON Ball where
         Lumpy <$> o .: "colour" <*> o .: "lumps"
 ```
 
-# What are we fixing?
-
-## And we want to print.
+# And we want to print.
 
 ```haskell
 instance ToJSON Ball where
@@ -173,13 +164,14 @@ Potential errors and good programmers *HATE* typing
 "12/2012"
 ```
 
-OR
+. . .
 
 ```json
 "12.2012"
 ```
 
-OR
+. . .
+
 
 ```json
 "122012"
@@ -216,18 +208,14 @@ OR
 
 ![](paper.png)\newline
 
-# Invertible Syntax Descriptions: way of the get/put
-
-## Given a datatype:
+# Given a datatype:
 ```haskell
 data List a
   = Nil
   | Cons a (List a)
 ```
 
-# Invertible Syntax Descriptions: way of the get/put
-
-## Printing$^1$
+# We define a Printer$^1$ combinator
 
 ```haskell
 type Printer a = a -> Doc
@@ -240,9 +228,8 @@ printMany p list
               <> printMany p xs
 ```
 
-. . .
+# And a Parser$^2$ combinator
 
-## Parsing$^2$
 ```haskell
 newtype Parser a = Parser (String -> [(a, String)])
 
@@ -253,9 +240,7 @@ parseMany p
                <*> parseMany p
 ```
 
-# Invertible Syntax Descriptions: way of the get/put
-
-## It would be nice if...
+# It would be nice if...
 
 ```haskell
 combined :: Unicorn x => x a -> x (List a)
@@ -265,9 +250,7 @@ combined p
                <*> parseMany p
 ```
 
-# Invertible Syntax Descriptions: co/contravariance
-
-[block=Parser fmap]
+# co/contravariance
 
 ```haskell
 newtype Parser a = Parser (String -> [(a, String)])
@@ -276,11 +259,8 @@ newtype Parser a = Parser (String -> [(a, String)])
 f <$> Parser p = Parser $ (fmap . first) f . p
 ```
 
-[/block]
-
 . . .
 
-[block=Printer fmap]
 
 ```haskell
 type Printer a = a -> Doc
@@ -288,17 +268,14 @@ type Printer a = a -> Doc
 (<$>) :: (a -> b) -> Printer a -> Printer b
 ```
 
-[/block]
-
 . . .
 
 Can you implement this? \arrowup
 
-# Invertible Syntax Descriptions: co/contravariance
+# co/contravariance
 
 Covariant  \arrowdown
 
-[block=Parser fmap]
 
 ```haskell
 newtype Parser a = Parser (String -> [(a, String)])
@@ -306,9 +283,6 @@ newtype Parser a = Parser (String -> [(a, String)])
 (<$>) :: (a -> b) -> Parser a -> Parser b
 ```
 
-[/block]
-
-[alert=Printer fmap]
 
 ```haskell
 type Printer a = a -> Doc
@@ -316,12 +290,10 @@ type Printer a = a -> Doc
 (<$>) :: (b -> a) -> Printer a -> Printer b
 ```
 
-[/alert]
 
 Contravariant \arrowup
 
-# Invertible Syntax Descriptions: co/contravariance
-## Partial Iso$^3$ (simplified)
+# Partial Iso$^3$ (simplified)
 
 ```haskell
 data Iso a b = Iso
@@ -330,9 +302,7 @@ data Iso a b = Iso
     }
 ```
 
-# Invertible Syntax Descriptions: co/contravariance
-
-[block=Parser fmap]
+# co/contravariance (revisited)
 
 ```haskell
 newtype Parser a = Parser (String -> [(a, String)])
@@ -340,19 +310,14 @@ newtype Parser a = Parser (String -> [(a, String)])
 (<$>) :: (a -> b) -> Parser a -> Parser b
 ```
 
-[/block]
-
 . . .
 
-[alert=Printer fmap]
 
 ```haskell
 type Printer a = a -> Doc
 
 (<$>) :: (b -> a) -> Printer a -> Printer b
 ```
-
-[/alert]
 
 . . .
 
@@ -365,11 +330,7 @@ class IsoFunctor f where
 
 [/block]
 
-# Invertible Syntax Descriptions: co/contravariance
-
-The important things about partial isos and IsoFunctor:
-
-. . .
+# The important things about partial isos
 
 * Unifying a functor requires both $a \to b$ and $b \to a$
 
@@ -381,9 +342,7 @@ The important things about partial isos and IsoFunctor:
 
 * We defined IsoFunctor (from partial isos to printer/parsers)
 
-# Invertible Syntax Descriptions: applicative
-
-[block=Normal applicative]
+# Applicative
 
 ```haskell
 (<*>) :: f (a -> b) -> f a -> f b
@@ -392,36 +351,26 @@ instance Applicative Parser where
   (<*>) :: Parser (a -> b) -> Parser a -> Parser b
 ```
 
-[/block]
-
 . . .
 
-[block=Adapting that directly]
 
 ```haskell
 class UnhelpfulIsoApplicative where
   (<*>) :: f (Iso a b) -> f a -> f b
 ```
 
-[/block]
-
 . . .
-
-[alert=Falls apart on Printer (the contravariant one)]
 
 ```haskell
 type Printer a = a -> Doc
 
 instance UnhelpfulIsoApplicative Printer where
   (<*>) :: (Iso a b -> Doc) -> (a -> Doc) -> b -> Doc
-  (f <*> g) b = error "impossible!"
+  (f <*> g) b = error "how do I shot web?"
 ```
 
-[/alert]
+# Applicative
 
-# Invertible Syntax Descriptions: applicative
-
-## Normal applicative
 ```haskell
 class Functor f => Applicative f where
   (<*>) :: f (a -> b) -> f a -> f b
@@ -429,17 +378,13 @@ class Functor f => Applicative f where
 
 . . .
 
-## *#!@ it, associate right and tuple (ProductFunctor$^5$)
-
 ```haskell
 class ProductFunctor f where
   infixr 6 <*>
   (<*>) :: f a -> f b -> f (a, b)
 ```
 
-# Invertible Syntax Descriptions: applicative
-
-## Normal (currying applicative, left associative)
+# Applicative example
 
 ```haskell
 f :: Applicative f
@@ -451,7 +396,7 @@ f ctor fa fb fc = ((ctor <$> fa) <*> fb) <*> fc
 
 . . .
 
-## Our new, alternate universe
+\center{\arrowdown}
 
 ```haskell
 f :: (ProductFunctor f, IsoFunctor f)
@@ -461,9 +406,7 @@ f ctor fa fb fc = ctor <$>  fa <*> fb  <*> fc
 f ctor fa fb fc = ctor <$> (fa <*> (fb <*> fc))
 ```
 
-# Invertible Syntax Descriptions: applicative
-
-## We want these tuple tree isos for our data types
+# We tuple tree isos for our data types
 
 ```haskell
 nil  :: Iso ()          (List a)
@@ -471,8 +414,8 @@ cons :: Iso (a, List a) (List a)
 ```
 
 . . .
+\center{\arrowup}
 
-## So we magic them up from the data type:
 ```haskell
 data List a
   = Nil
@@ -481,9 +424,7 @@ data List a
 defineIsomorphisms ''List
 ```
 
-# Invertible Syntax Descriptions: applicative
-
-The important things about ProductFunctor:
+# The important things: ProductFunctor
 
 . . .
 
@@ -498,15 +439,14 @@ The important things about ProductFunctor:
 
 * <*> mushes tuples together one way, and takes them apart the other
 
-# Invertible Syntax Descriptions: alternative
+# Almost done, Alternative$^6$ is trivial
 
-## Alternative$^6$ is trivial
 ```haskell
 class Alternative where
   (<|>) :: f a -> f a -> f a
 ```
 
-## And we now have an abstract Syntax$^7$
+# We now have an abstract Syntax$^7$
 ```haskell
 
 class (IsoFunctor s, ProductFunctor s, Alternative s)
@@ -516,17 +456,12 @@ class (IsoFunctor s, ProductFunctor s, Alternative s)
 
 # Invertible Syntax Descriptions: the punchline
 
-## Parsing
 ```haskell
 parseMany :: Parser a -> Parser (List a)
 parseMany p
   =  const Nil <$> text ""
  <|> Cons      <$> p
-               <*> parseMany p
-```
 
-## Printing
-```haskell
 printMany :: (a -> Doc) -> (List a -> Doc)
 printMany p list
   = case list of
@@ -537,7 +472,6 @@ printMany p list
 
 # Invertible Syntax Descriptions: the punchline
 
-## Invertible many
 ```haskell
 many :: Syntax s => s a -> s (List a)
 many p
@@ -545,9 +479,8 @@ many p
  <|> cons <$> p <*> many p
 ```
 
-# Invertible Syntax Descriptions: printer syntax
+# The implementation of Syntax for Printer
 
-## The implementation of Syntax for Printer
 ```haskell
 instance IsoFunctor Printer where
   iso <$> Printer p
@@ -558,8 +491,7 @@ instance ProductFunctor Printer where
     = Printer (\(x, y) -> liftM2 (++) (p x) (q y))
 
 instance Alternative Printer where
-  Printer p <|> Printer q
-    = Printer (\s -> mplus (p s) (q s))
+  Printer p <|> Printer q = Printer (\s -> mplus (p s) (q s))
 
 instance Syntax Printer where
   pure x
@@ -588,9 +520,7 @@ instance Syntax Printer where
 
 ![We are now enterprise developers](dog.jpg)
 
-# Let's try it on enterprise JSON!
-
-## Two primitives for all your JSON needs:
+# Two primitives for all your JSON needs:
 
 ```haskell
 class Syntax s => JsonSyntax s where
@@ -599,9 +529,7 @@ class Syntax s => JsonSyntax s where
     value :: s Value
 ```
 
-# JsonBuilder/Parser IsoFunctor
-
-## Starts off simple
+# JsonBuilder/Parser IsoFunctor, simple!
 ``` haskell
 newtype JsonBuilder a = JsonBuilder
   { runBuilder :: a -> Maybe Value }
@@ -617,15 +545,11 @@ instance IsoFunctor JsonParser where
   (<$>) :: Iso a b -> JsonParser a -> JsonParser b
   i <$> JsonParser p = JsonParser $ apply i <=< p
 ```
-# JsonBuilder ProductFunctor
-
-## Mush tuples together with applicative when building
+# JsonBuilder ProductFunctor: Mush tuples together
 
 ```haskell
 instance ProductFunctor JsonBuilder where
-  (<*>) :: JsonBuilder a
-        -> JsonBuilder b
-        -> JsonBuilder (a,b)
+  (<*>) :: JsonBuilder a -> JsonBuilder b -> JsonBuilder (a,b)
   JsonBuilder p <*> JsonBuilder q =
     JsonBuilder $ \(a,b) -> do
       a' <- p a
@@ -640,9 +564,8 @@ instance ProductFunctor JsonBuilder where
       merge _ _ = Nothing
 ```
 
-# JsonParser ProductFunctor
+# JsonParser ProductFunctor: Tuple the things
 
-## Take the things apart and tuple them when parsing
 ```haskell
 instance ProductFunctor JsonParser where
   (<*>) :: JsonParser a -> JsonParser b -> JsonParser (a,b)
@@ -657,10 +580,8 @@ instance ProductFunctor JsonParser where
       liftM2 (,) (p a) (q b)
 ```
 
-# JsonBuilder/Parser Alternative
+# JsonBuilder/Parser Alternative: Try one, then the other
 
-
-## Try one, otherwise the other. Same implementation.
 ```haskell
 instance Alternative JsonBuilder where
   (<||>) :: JsonBuilder a -> JsonBuilder a -> JsonBuilder a
@@ -680,8 +601,8 @@ instance Alternative JsonParser where
 ```
 
 
-# JsonBuilder/Parser JsonSyntax
-## Providing access to underlying JSON Values
+# JsonBuilder/Parser JsonSyntax: Providing access to Values
+
 ```haskell
 instance JsonSyntax JsonBuilder where
   value :: JsonBuilder Value
@@ -705,7 +626,6 @@ instance JsonSyntax JsonParser where
 The lens-aeson package provides primitives for most of the combinators we want,
 but it has these \sout{terrifying} powerful Prism things:
 
-## Prism
 ```haskell
 type Prism s t a b =
     (Choice p, Applicative f) =>
@@ -714,15 +634,16 @@ type Prism s t a b =
 type Prism' s a = Prism s s a a
 ```
 
+. . .
 
-## Review/preview
+
 ```haskell
 preview :: Prism' a b -> a -> Maybe b
 review  :: Prism' a b -> b -> a
 ```
+
 # Prisms/isos are "stronger" than partial isos
 
-## Demoting prisms and "real" isos to partial ones
 ```haskell
 demote :: Prism' a b -> Iso a b
 demote p = unsafeMakeIso (preview p)
@@ -731,15 +652,12 @@ demote p = unsafeMakeIso (preview p)
 
 # JsonSyntax combinators
 
-## Given a "free" Prism from lens-aeson
-
 ```haskell
 _Bool :: Prism' Value Bool
 ```
 
 . . . 
 
-## We can get an Iso and have a Value
 ```haskell
 demote _Bool :: Iso Value Bool
 value :: Syntax s => s Value
@@ -747,7 +665,7 @@ value :: Syntax s => s Value
 
 . . .
 
-## Fmapping these gives us "free" combinators
+
 ```haskell
 (<$>) :: Iso Value Bool -> s Value -> s Bool
 
@@ -765,9 +683,7 @@ jsonString :: JsonSyntax s => s Text
 jsonString = demote _String <$> value
 ```
 
-# JsonSyntax combinators
-
-## Looking up keys in objects
+# Combinators: Looking up keys in objects
 
 ```haskell
 runSub :: s v -> s Value -> s v
@@ -785,9 +701,7 @@ jsonField k syntax = runSub syntax (keyIso <$> value)
                              (^? key k)
 ```
 
-# JsonSyntax combinators
-
-## When you want to ensure something is there
+# Combinators: When you want to ensure something is there
 
 ```haskell
 is :: (JsonSyntax s, Eq a) => s a -> a -> s ()
@@ -818,9 +732,7 @@ is s a = demote (prism' (const a)
 
 ![A happy ball](tripping.jpg)
 
-# Example - Round-tripping balls
-
-## We can have either bouncy or lumpy balls
+# We can have either bouncy or lumpy balls
 ```haskell
 data Ball
     = Lumpy  { _colour     :: Text
@@ -830,9 +742,8 @@ data Ball
   deriving (Eq, Show)
 ```
 
-# Example - Round-tripping balls
+# Bouncy balls are happy, lumpy ones are not.
 
-## Bouncy balls are happy, lumpy ones are not.
 ```haskell
 [ Lumpy  {_colour = "Rainbow"
          , _lumps = [[True,False],[False,False]]}
@@ -854,9 +765,7 @@ data Ball
 ]
 ```
 
-# Example - Round-tripping balls
-
-## Ball syntax
+# Ball syntax
 
 ```haskell
 ballSyntax :: JsonSyntax s => s Ball
@@ -869,9 +778,7 @@ ballSyntax
             *> jsonField "bouncyness" jsonRealFloat
 ```
 
-# Example - Round-tripping balls
-
-## The test
+# The test
 
 ```haskell
 main :: IO ()
@@ -889,9 +796,7 @@ main = do
     print $ pit == pit'
 ```
 
-# Example - Round-tripping balls
-
-## Output (whitespace added)
+# Output (whitespace added)
 
 ```javascript
 [  {
@@ -905,22 +810,18 @@ main = do
 }  ]
 
 [ Lumpy "Rainbow" [[True,False],[False,False]]
-, Bouncy 3.141592653589793
-]
+, Bouncy 3.141592653589793 ]
 
 True
 ```
 
-# Real world example with full library
+# Real world example (currency)
 
-## Currency parser
 ```haskell
 -- | Parse an enterprise currency field, which is a
 --   blob of text looking like:
 --
 --   "00.43"
---
--- This un-/parser retains all precision avaliable.
 currency :: JsonSyntax s => s Scientific
 currency = demoteLR "currency" (prism' f g) <$> value
   where
@@ -932,9 +833,7 @@ currency = demoteLR "currency" (prism' f g) <$> value
     fmt = LT.formatScientificBuilder Fixed Nothing
 ```
 
-# Real world example with full library
-
-## Date time parser
+# Real world example (datetime)
 
 ```haskell
 -- | Parse an enterprise datetime field, looks like:
@@ -980,9 +879,7 @@ datetime = demoteLR "datetime" (prism' f g) <$> value
 
 * Our library: http://github.com/anchor/roundtrip-aeson
 
-# A note on categories
-
-## Ekmett's "categories" package, more category-like functors.
+# A note on categories and type classes
 
 ```haskell
 import qualified Control.Categorical.Functor as CF

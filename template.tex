@@ -11,13 +11,21 @@
 \setbeamertemplate{itemize items}[default]
 \setbeamertemplate{enumerate items}[default]
 
-
 \setbeamercolor{normal text}{fg=white,bg=black!95}
 \setbeamercolor{structure}{fg=white}
 
 \setbeamercolor{alerted text}{fg=red!60!white}
 
 \setbeamercolor{item projected}{use=item,fg=black,bg=item.fg!35}
+
+\definecolor{BlueLike}{RGB}{83,121,170}
+\definecolor{BlueDifferentLike}{RGB}{93,106,251}
+\definecolor{Carrot}{RGB}{255,137,67}
+\definecolor{Rounge}{RGB}{255,102,0}
+\definecolor{Pinkish}{RGB}{201,124,204}
+
+\setbeamercolor{title}{fg=BlueDifferentLike}
+\setbeamercolor{structure}{fg=Rounge}
 
 \setbeamercolor*{palette primary}{use=structure,fg=structure.fg}
 \setbeamercolor*{palette secondary}{use=structure,fg=structure.fg!95!black}
@@ -46,3 +54,9 @@
 \newcommand{\arrowdown}{%
 \tikz [baseline=-1ex]{\node [myarrow,rotate=-90] {};}
 }
+\newcommand{\arrowright}{%
+\tikz [baseline=-1ex]{\node [myarrow,rotate=0] {};}
+}
+
+\inputencoding{utf8}
+\usepackage[orientation=landscape,size=custom,width=16,height=9,scale=0.5,debug]{beamerposter} 
